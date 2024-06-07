@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include<assert.h>
 
 typedef unsigned long int lint_16;
 
@@ -30,10 +31,11 @@ static void readTorrentFile(const char* filePath){
 	unsigned char *buffer = (unsigned char *) malloc(fileSize);
 	lint_16 readSize = fread(buffer,1,fileSize,fileptr);
 	//check if we read everything
-	if(readSize != fileSize){
+	/*if(readSize != fileSize){
 		fprintf(stdin,"\nCould not read the contents\n");
 		exit(-1);
-	}
+	}*/
+	assert(readSize == fileSize);
 	printf("%s",buffer);
 	free(buffer);
 	fclose(fileptr);
