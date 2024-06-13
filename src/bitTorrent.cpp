@@ -9,16 +9,32 @@ typedef unsigned long int lint_16;
 typedef struct{
 	char BYTE_STRING;
 	char INTEGER;
-	char LISTS;
+	char LIST;
 	char DICTIONARY;
 }Bencoder;
 
+
+//Article about implementing Bencode parser: https://www.codeproject.com/articles/37533/bencode-lexing-in-c-2nd-stage
+
+
 Bencoder BencoderValues = (Bencoder){' ','i','l','d'};
+
+#define SIZE
+typedef struct{
+	int sizeOfMap;
+	char ***MapData;
+}Map;
 
 static void readTorrentFile(const char* filePath);
 static void BencoderReader(const unsigned char* fileContent);
 static void FAILUREEXIT(int errorCode);
+//We will be implementing a map to store the values we get decode from
+//the torrent file
 
+/*
+A map is essentially a key-value pair link
+*/
+static Map* createMap(); //Will create our map
 
 //Make sure file is in current directory
 static void readTorrentFile(const char* filePath){
@@ -58,7 +74,7 @@ static void readTorrentFile(const char* filePath){
 	assert(readSize == fileSize);
 	printf("\n%s\n",buffer);
 	printf("\nRead Size = %li, File Size = %li\n",readSize,fileSize);
-	printf("\n%lu\n",sizeof(buffer));
+	//printf("\n%lu\n",sizeof(buffer));
 	BencoderReader(buffer);
 	free(buffer);
 	fclose(fileptr);
@@ -82,11 +98,34 @@ static void BencoderReader(const unsigned char* fileContent){
 	int pointer2 = 0;
 	char firstCharacter = fileContent[0];
 
-	printf("\n%c\n",firstCharacter);
+
+	//This algorithm assumes that the torrent file is correctly encoded using Bencode
+	//check if we have a dictionary, list or integer, otherwise we have a string
+
+	//This is for just the first character
+
+	if(firstCharacter == BencoderValues.INTEGER){ //is an Integer
+		printf("\nInteger\n");
+	}
+	else if(firstCharacter == BencoderValues.LIST){//is a List
+		printf("\nList\n");
+	}
+	else if(firstCharacter == BencoderValues.DICTIONARY){//is a Dictionary
+		printf("\nDictionary\n");
+	}
+	else{//if above conditions are not true, must be a BYTE string
+		printf("\nByte String\n");
+	}
+
 }
 
 static void FAILUREEXIT(int errorCode){
 	exit(errorCode);
+}
+
+static Map* createMap(){
+	Map map = {0,NULL};
+	return map;
 }
 
 int main(int argc, char ** argv){
