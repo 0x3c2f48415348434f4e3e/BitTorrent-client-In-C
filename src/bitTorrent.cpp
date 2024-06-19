@@ -28,6 +28,8 @@ typedef struct{
 static void readTorrentFile(const char* filePath);
 static void BencoderReader(const unsigned char* fileContent);
 static void FAILUREEXIT(int errorCode);
+static void lexer();
+static void stringToInteger(char *string);
 //We will be implementing a map to store the values we get decode from
 //the torrent file
 
@@ -126,6 +128,86 @@ static void FAILUREEXIT(int errorCode){
 static Map* createMap(){
 	Map map = {0,NULL};
 	return map;
+}
+
+static void lexer(char *stream)
+	//We will try and just create a lexer that takes the input
+	//stream and convets it to (somewhat) token and outputs it
+	//
+	//we will need 2 pointers
+	lint_16 pointer = 0; //points to beginning of first character in stream
+	lint_16 pointer2 = 0; //allow us to navigate out final string result
+	char *lexerResult = malloc(sizeof(char)*1024);
+	//char firstCharacter = stream; //stream is a pointer that points to ffirst character
+	int StreamNotEnd = 1;
+	//use while loop here
+	if(*(stream+pointer) == BencoderValues.INTEGER){
+		//increment pointer to skip i
+		pointer++;
+		while(*(stream+pointer) != 'e'){
+			*(lexerResult+pointer2) = *(stream+pointer);
+			pointer++;
+			pointer2++;
+		}
+	else if(*(stream+pointer) == BencoderValues.LIST){
+		//do stuff for list
+		//increment pointer to skip the l
+		pointer++;
+		//will check if is negative later
+		char num[1000]; //assuming we do not surpass the number 1000
+		memset(num,0,size0f(char));
+		int tempPoint = 0;
+		while(*(stream+pointer) != ':'){
+			*(num+tempPoint) = *(stream+pointer);
+			tempPoint++;
+			pointer++;
+		}
+
+		//coonver the string to an integer 
+		int lengthOfString = stringToInteger(num);
+		//incrment pointer to skip colon
+		pointer++;
+		register int i = 0;
+		char string
+		for(;i<lengthOfString;i++){
+			*(lexerResult+pointer2) = *(stream+(pointer++)); 
+		}
+	}
+	else if(*(stream+pointer) == BencoderValues.DICTIONARY){
+		//do stuff for Dictionary
+	}
+
+		//do string as final
+	else{
+		//get the number, then add to the pointer
+		//but before we get number, we have to use loop to see when we reach a colon :
+		char * num = NULL;
+		int tempPoint = 0;
+		while(*(stream+pointer) ! = ':'){
+			num[tempPoint] = *(stream+pointer);
+			tempPoint++;
+			pointer++;
+
+		}
+
+
+	}
+
+	//testing
+
+	printf("lexerResult");
+
+	free(lexerResult)
+}
+
+static int stringToInteger(char *string){
+	register int i = 0;
+	static int res = 0;
+	for(;string[i] != '\0';){
+		res = (res*10) + (string[i] - 48);// ASCII stuff
+		i++;
+	}
+	return res;
 }
 
 int main(int argc, char ** argv){

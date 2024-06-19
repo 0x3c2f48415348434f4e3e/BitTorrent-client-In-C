@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -Wall -pedantic
+CFLAGS = -Wall -Werror -pedantic
 TARGET = bitTorrent
 OBJ = $(wildcard *.cpp)
 SRC = $(wildcard *.cpp)
