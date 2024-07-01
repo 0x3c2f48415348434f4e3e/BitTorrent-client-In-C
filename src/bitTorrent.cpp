@@ -16,6 +16,7 @@ typedef struct{
 
 //Article about implementing Bencode parser: https://www.codeproject.com/articles/37533/bencode-lexing-in-c-2nd-stage
 
+//https://blog.jse.li/posts/torrent/
 
 Bencoder BencoderValues = (Bencoder){' ','i','l','d'};
 
@@ -30,6 +31,7 @@ static void BencoderReader(const unsigned char* fileContent);
 static void FAILUREEXIT(int errorCode);
 static void lexer();
 static void stringToInteger(char *string);
+static char* subString(char *string, lint_16 pointer)
 //We will be implementing a map to store the values we get decode from
 //the torrent file
 
@@ -130,84 +132,124 @@ static Map* createMap(){
 	return map;
 }
 
-static void lexer(char *stream)
-	//We will try and just create a lexer that takes the input
-	//stream and convets it to (somewhat) token and outputs it
-	//
-	//we will need 2 pointers
-	lint_16 pointer = 0; //points to beginning of first character in stream
-	lint_16 pointer2 = 0; //allow us to navigate out final string result
-	char *lexerResult = malloc(sizeof(char)*1024);
-	//char firstCharacter = stream; //stream is a pointer that points to ffirst character
-	int StreamNotEnd = 1;
-	//use while loop here
-	if(*(stream+pointer) == BencoderValues.INTEGER){
-		//increment pointer to skip i
-		pointer++;
-		while(*(stream+pointer) != 'e'){
-			*(lexerResult+pointer2) = *(stream+pointer);
-			pointer++;
-			pointer2++;
-		}
-	else if(*(stream+pointer) == BencoderValues.LIST){
-		//do stuff for list
-		//increment pointer to skip the l
-		pointer++;
-		//will check if is negative later
-		char num[1000]; //assuming we do not surpass the number 1000
-		memset(num,0,size0f(char));
-		int tempPoint = 0;
-		while(*(stream+pointer) != ':'){
-			*(num+tempPoint) = *(stream+pointer);
-			tempPoint++;
-			pointer++;
-		}
+static void lexer(char *stream) {
+    lint_16 pointer = 0; // points to beginning of first character in stream
+    lint_16 pointer2 = 0; // allow us to navigate out final string result
+    char *lexerResult = malloc(sizeof(char) * BUFFER);
 
-		//coonver the string to an integer 
-		int lengthOfString = stringToInteger(num);
-		//incrment pointer to skip colon
-		pointer++;
-		register int i = 0;
-		char string
-		for(;i<lengthOfString;i++){
-			*(lexerResult+pointer2) = *(stream+(pointer++)); 
-		}
-	}
-	else if(*(stream+pointer) == BencoderValues.DICTIONARY){
-		//do stuff for Dictionary
-	}
+    // check if memory allocation was successful
+    if (lexerResult == NULL) {
+        fprintf(stderr, "Unable to initialise memory");
+        exit(-1);
+    }
 
-		//do string as final
-	else{
-		//get the number, then add to the pointer
-		//but before we get number, we have to use loop to see when we reach a colon :
-		char * num = NULL;
-		int tempPoint = 0;
-		while(*(stream+pointer) ! = ':'){
-			num[tempPoint] = *(stream+pointer);
-			tempPoint++;
-			pointer++;
+    if (*(stream + pointer) == BencoderValues.INTEGER) {
+        printf("Is an Integer\n");
+        pointer++;//skip the i
+        //check for negative
+        while (*(stream + pointer) != 'e') {
+            *(lexerResult + pointer2) = *(stream + pointer);
+            pointer++;
+            pointer2++;
+        }
+        pointer++; // Skip 'e'
+        //printf("Integer: %s\n", lexerResult);
+        /*if (*(stream + pointer) != '\0') {
+            lexer(stream + pointer);
+        }*/
+        //*(lexerResult + pointer2) = '\0';
+    } else if (*(stream + pointer) == BencoderValues.LIST) {
+        printf("Is a List\n");
+        pointer++;//skip the l
+        while (*(stream + pointer) != 'e') {
+            //list can have nested data structures so we accompany for that
+            if (*(stream + pointer) == 'i' || *(stream + pointer) == 'l' || *(stream + pointer) == 'd') {
+                lexer(stream + pointer);
+                while (*(stream + pointer) != 'e'){
+                    pointer++; //move pointer to final position of e
+                }
+            } else {
+                char num[1000] = {0};
+                int tempPoint = 0;
+                while (*(stream + pointer) != ':') {
+                    num[tempPoint] = *(stream + pointer);
+                    tempPoint++;
+                    pointer++;
+                }
+                int lengthOfString = stringToInteger(num);
+                pointer++; //skip colon
+                for (int i = 0; i < lengthOfString; i++) {
+                    *(lexerResult + pointer2++) = *(stream + pointer++);
+                }
+                //printf("String: %s\n", lexerResult);
+            }
+        }
+        //pointer++; // Skip 'e'
+    } else if (*(stream + pointer) == BencoderValues.DICTIONARY) {
+        printf("Is a dictionary\n");
+        pointer++;
+        while (*(stream + pointer) != 'e') {
+            lexer(stream + pointer);
+            while (*(stream + pointer) != 'e') pointer++;
+        }
+        pointer++; // Skip 'e'
+    } else {
+        printf("Is a String\n");
+        char num[1000] = {0};
+        int tempPoint = 0;
+        while (*(stream + pointer) != ':') {
+            num[tempPoint] = *(stream + pointer);
+            tempPoint++;
+            pointer++;
+        }
+        int lengthOfString = stringToInteger(num);
+        pointer++;
+        for (int i = 0; i < lengthOfString; i++) {
+            *(lexerResult + pointer2++) = *(stream + pointer++);
+        }
+        //*(lexerResult + pointer2) = '\0';
+        //printf("String: %s\n", lexerResult);
+        if (*(stream + pointer) != '\0') {
+            lexer(stream + pointer);
+        }
+    }
+    *(lexerResult+pointer2) = '\0';
+    printf("%s\n",lexerResult);
 
-		}
-
-
-	}
-
-	//testing
-
-	printf("lexerResult");
-
-	free(lexerResult)
+    free(lexerResult);
 }
 
-static int stringToInteger(char *string){
-	register int i = 0;
-	static int res = 0;
-	for(;string[i] != '\0';){
-		res = (res*10) + (string[i] - 48);// ASCII stuff
-		i++;
-	}
-	return res;
+static int stringToInteger(char *string) {
+    int res = 0;
+    for (int i = 0; string[i] != '\0'; i++) {
+        res = (res * 10) + (string[i] - '0');
+    }
+    return res;
+}
+
+static char* subString(char *string, lint_16 pointer) {
+    char *result = malloc(sizeof(char) * BUFFER);
+    if (result == NULL) {
+        fprintf(stderr, "Unable to initialise memory");
+        exit(-1);
+    }
+    int i = 0;
+    int currentBufferSize = BUFFER;
+    while (string[pointer] != '\0') {
+        if (i >= currentBufferSize) {
+            currentBufferSize += BUFFER;
+            result = realloc(result, currentBufferSize);
+            if (result == NULL) {
+                fprintf(stderr, "Unable to reallocate memory");
+                exit(-1);
+            }
+        }
+        result[i] = string[pointer];
+        i++;
+        pointer++;
+    }
+    result[i] = '\0'; // Null-terminate the string
+    return result;
 }
 
 int main(int argc, char ** argv){
