@@ -13,6 +13,17 @@ typedef struct{
 	char DICTIONARY;
 }Bencoder;
 
+//for our actual BencodeParser.
+//The way this works is that we are going to have a structure that represents a single element like a string, integer, List, Dictionary etc, and then within this structure we will have a linked list that represents the next element
+struct bP bencodeParser;
+struct bP{
+	union{
+		lint_16 integerValue;
+		char* stringValue;
+		bencodeParser *List_Dictionary;
+	}value;
+	bencodeParser *next;
+}bencodeParser;
 
 //Article about implementing Bencode parser: https://www.codeproject.com/articles/37533/bencode-lexing-in-c-2nd-stage
 
@@ -163,7 +174,7 @@ static void lexer(char *stream) {
         pointer++;//skip the l
         while (*(stream + pointer) != 'e') {
             //list can have nested data structures so we accompany for that
-            if (*(stream + pointer) == 'i' || *(stream + pointer) == 'l' || *(stream + pointer) == 'd') {
+            if (*(stream + pointer) == BencoderValues.INTEGER || *(stream + pointer) == BencoderValues.LIST || *(stream + pointer) == BencoderValues.DICTIONARY) {
                 lexer(stream + pointer);
                 while (*(stream + pointer) != 'e'){
                     pointer++; //move pointer to final position of e
@@ -251,6 +262,10 @@ static char* subString(char *string, lint_16 pointer) {
     result[i] = '\0'; // Null-terminate the string
     return result;
 }
+
+
+//not going to touch lexer, as that is for something else, will create another version for the parser
+
 
 int main(int argc, char ** argv){
 	readTorrentFile(argv[1]);
