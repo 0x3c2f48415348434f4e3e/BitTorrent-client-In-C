@@ -2,8 +2,10 @@
 #include<stdlib.h>
 #include<assert.h>
 #include<stddef.h>
+#include<string.h>
 
 typedef unsigned long int lint_16;
+#define BUFFER 2028
 #define TORRENTFILENOTFOUNDERRORLOG(...) {printf("In file %s, given file not found: %s\n",__FILE__,__VA_ARGS__);}
 #define MALLOCALLOCATIONERROR(...) {printf("In file %s, Memory allocation failed",__FILE__);}
 typedef struct{
@@ -15,8 +17,9 @@ typedef struct{
 
 //for our actual BencodeParser.
 //The way this works is that we are going to have a structure that represents a single element like a string, integer, List, Dictionary etc, and then within this structure we will have a linked list that represents the next element
-struct bP bencodeParser;
-struct bP{
+typedef struct B bencodeParser;
+typedef struct B {
+    char dataType[100];
 	union{
 		lint_16 integerValue;
 		char* stringValue;
@@ -29,7 +32,7 @@ struct bP{
 
 //https://blog.jse.li/posts/torrent/
 
-Bencoder BencoderValues = (Bencoder){' ','i','l','d'};
+Bencoder BencoderValues;// = (Bencoder){' ','i','l','d'};
 
 #define SIZE
 typedef struct{
@@ -37,22 +40,18 @@ typedef struct{
 	char ***MapData;
 }Map;
 
-static void readTorrentFile(const char* filePath);
-static void BencoderReader(const unsigned char* fileContent);
+static char* readTorrentFile(const char* filePath);
+static int compare(char* string);
 static void FAILUREEXIT(int errorCode);
-static void lexer();
-static void stringToInteger(char *string);
-static char* subString(char *string, lint_16 pointer)
-//We will be implementing a map to store the values we get decode from
+static void lexer(char *stream);
+static int stringToInteger(char *string);
+static char* subString(char *string, lint_16 pointer);
+static void readBencode(bencodeParser *Head);	
+	//We will be implementing a map to store the values we get decode from
 //the torrent file
 
-/*
-A map is essentially a key-value pair link
-*/
-static Map* createMap(); //Will create our map
-
 //Make sure file is in current directory
-static void readTorrentFile(const char* filePath){
+static char* readTorrentFile(const char* filePath){
 	FILE *fileptr;
 	fileptr = fopen(filePath,"r");
 	void (*exitProgram)(int) = &FAILUREEXIT;
@@ -73,7 +72,7 @@ static void readTorrentFile(const char* filePath){
 	fseek(fileptr,0,SEEK_SET);
 	//allocate space in memory to hold content as size of file will
 	//only be known at run time
-	unsigned char *buffer = (unsigned char *) malloc(fileSize);
+	char *buffer = (char *) malloc(fileSize);
 	if(buffer == NULL){
 		//memory allocation failed
 		MALLOCALLOCATIONERROR();
@@ -87,75 +86,63 @@ static void readTorrentFile(const char* filePath){
 		exit(-1);
 	}*/
 	assert(readSize == fileSize);
-	printf("\n%s\n",buffer);
-	printf("\nRead Size = %li, File Size = %li\n",readSize,fileSize);
+	//printf("\n%s\n",buffer);
+	//printf("\nRead Size = %li, File Size = %li\n",readSize,fileSize);
 	//printf("\n%lu\n",sizeof(buffer));
-	BencoderReader(buffer);
-	free(buffer);
+	//BencoderReader(buffer);
+	//free(buffer);
 	fclose(fileptr);
-	return;
+	return buffer;
 }
 
-static void BencoderReader(const unsigned char* fileContent){
-	//let do things step by step
-	//Noow logically, the first character in the file will tell use
-	//the type of value/data we are dealing with
-	//can be:
+static int compare(char* string){
+
 	/*
-	1.) bytestring
-	2.) integer
-	3.) lists
-	4.) Dictionary
-	*/
-
-	//have pointers to navigate the file
-	int pointer1 = 0;
-	int pointer2 = 0;
-	char firstCharacter = fileContent[0];
-
-
-	//This algorithm assumes that the torrent file is correctly encoded using Bencode
-	//check if we have a dictionary, list or integer, otherwise we have a string
-
-	//This is for just the first character
-
-	if(firstCharacter == BencoderValues.INTEGER){ //is an Integer
-		printf("\nInteger\n");
-	}
-	else if(firstCharacter == BencoderValues.LIST){//is a List
-		printf("\nList\n");
-	}
-	else if(firstCharacter == BencoderValues.DICTIONARY){//is a Dictionary
-		printf("\nDictionary\n");
-	}
-	else{//if above conditions are not true, must be a BYTE string
-		printf("\nByte String\n");
-	}
-
+	 * Will return:
+	 * 1 for string
+	 * 2 for integer
+	 * 3 for List and dictionary
+	 */
+    
+	/*if(strcpy(string,myString) == 0) return 1;
+	if(strcpy(string,myInteger) == 0) return 2;
+	if((strcpy(string,myList) == 0) || (strcpy(string,myDictionary) == 0)) return 3;*/
+	return -1; //for some error
 }
 
 static void FAILUREEXIT(int errorCode){
 	exit(errorCode);
 }
 
-static Map* createMap(){
-	Map map = {0,NULL};
-	return map;
-}
 
 static void lexer(char *stream) {
+    //check if the string is not end
+    bencodeParser *Head = NULL;
+    bencodeParser *Tail = NULL;
+    
     lint_16 pointer = 0; // points to beginning of first character in stream
     lint_16 pointer2 = 0; // allow us to navigate out final string result
-    char *lexerResult = malloc(sizeof(char) * BUFFER);
-
+    char *lexerResult = (char *) malloc(sizeof(char) * BUFFER);
     // check if memory allocation was successful
     if (lexerResult == NULL) {
         fprintf(stderr, "Unable to initialise memory");
         exit(-1);
     }
-
+    
+    bencodeParser *element = (bencodeParser *) malloc(sizeof(bencodeParser));
+    // check if memory allocation was successful
+    if(element == NULL){
+        fprintf(stderr, "Unable to initialise memory");
+        exit(-1);
+    }
+    element->next = NULL;
+    
     if (*(stream + pointer) == BencoderValues.INTEGER) {
-        printf("Is an Integer\n");
+	   strcpy(element->dataType,"Integer");
+        //element->next = NULL;
+	    //printf("Is an Integer\n");
+	    //make a node here for the INTEGER value
+
         pointer++;//skip the i
         //check for negative
         while (*(stream + pointer) != 'e') {
@@ -163,27 +150,24 @@ static void lexer(char *stream) {
             pointer++;
             pointer2++;
         }
-        pointer++; // Skip 'e'
-        //printf("Integer: %s\n", lexerResult);
-        /*if (*(stream + pointer) != '\0') {
-            lexer(stream + pointer);
-        }*/
-        //*(lexerResult + pointer2) = '\0';
+
     } else if (*(stream + pointer) == BencoderValues.LIST) {
-        printf("Is a List\n");
+	//bencodeParser *element = (bencodeParser *) malloc(sizeof(bencodeParser));
+        strcpy(element->dataType,"List");
+	    //printf("Is a List\n");
         pointer++;//skip the l
         while (*(stream + pointer) != 'e') {
             //list can have nested data structures so we accompany for that
-            if (*(stream + pointer) == BencoderValues.INTEGER || *(stream + pointer) == BencoderValues.LIST || *(stream + pointer) == BencoderValues.DICTIONARY) {
-                lexer(stream + pointer);
-                while (*(stream + pointer) != 'e'){
-                    pointer++; //move pointer to final position of e
+	        if (*(stream + pointer) == BencoderValues.INTEGER || *(stream + pointer) == BencoderValues.LIST || *(stream + pointer) == BencoderValues.DICTIONARY){
+		        lexer(stream + pointer);
+        	    while (*(stream + pointer) != 'e'){
+			        pointer++; //move pointer to final position of e
                 }
             } else {
                 char num[1000] = {0};
                 int tempPoint = 0;
                 while (*(stream + pointer) != ':') {
-                    num[tempPoint] = *(stream + pointer);
+			        num[tempPoint] = *(stream + pointer);
                     tempPoint++;
                     pointer++;
                 }
@@ -197,7 +181,11 @@ static void lexer(char *stream) {
         }
         //pointer++; // Skip 'e'
     } else if (*(stream + pointer) == BencoderValues.DICTIONARY) {
-        printf("Is a dictionary\n");
+        //bencodeParser *element = (bencodeParser *) malloc(sizeof(bencodeParser));
+        strcpy(element->dataType,"Dictionary");
+	    
+	    //printf("Is a dictionary\n");
+    
         pointer++;
         while (*(stream + pointer) != 'e') {
             lexer(stream + pointer);
@@ -205,7 +193,10 @@ static void lexer(char *stream) {
         }
         pointer++; // Skip 'e'
     } else {
-        printf("Is a String\n");
+	    //bencodeParser *element = (bencodeParser *) malloc(sizeof(bencodeParser));
+        strcpy(element->dataType,"String");
+        //element->next = NULL;
+        //printf("Is a String\n");
         char num[1000] = {0};
         int tempPoint = 0;
         while (*(stream + pointer) != ':') {
@@ -225,10 +216,29 @@ static void lexer(char *stream) {
         }
     }
     *(lexerResult+pointer2) = '\0';
-    printf("%s\n",lexerResult);
+    
+    //element->next = NULL;
+    if(Head == NULL){
+        //linked list is empty
+	    Head = element;
+        Tail = element;
+    }
+    else{
+        //We have stuff in our linked list
+        //for our linked list, think of it like a snake, that is the head will always stay in the same position and the body/tail will grow
+        Tail->next = element;
+        Tail = element;
 
+   }
+
+    //printf("%s\n",lexerResult);
+	
+    readBencode(Head);
+
+    free(element);
     free(lexerResult);
 }
+
 
 static int stringToInteger(char *string) {
     int res = 0;
@@ -239,7 +249,7 @@ static int stringToInteger(char *string) {
 }
 
 static char* subString(char *string, lint_16 pointer) {
-    char *result = malloc(sizeof(char) * BUFFER);
+    char *result = (char *) malloc(sizeof(char) * BUFFER);
     if (result == NULL) {
         fprintf(stderr, "Unable to initialise memory");
         exit(-1);
@@ -249,7 +259,7 @@ static char* subString(char *string, lint_16 pointer) {
     while (string[pointer] != '\0') {
         if (i >= currentBufferSize) {
             currentBufferSize += BUFFER;
-            result = realloc(result, currentBufferSize);
+            result = (char *) realloc(result, currentBufferSize);
             if (result == NULL) {
                 fprintf(stderr, "Unable to reallocate memory");
                 exit(-1);
@@ -263,10 +273,35 @@ static char* subString(char *string, lint_16 pointer) {
     return result;
 }
 
-
-//not going to touch lexer, as that is for something else, will create another version for the parser
-
+static void readBencode(bencodeParser *Head){
+	while(Head){
+        printf("\n%s\n",Head->dataType);
+		if(strcmp(Head->dataType, "String") == 0){
+			printf("%s",Head->value.stringValue);
+		}
+		else if(strcmp(Head->dataType,"Integer") == 0){
+			printf("%li",Head->value.integerValue);
+		}
+		else if(strcmp(Head->dataType,"List") == 0 || strcpy(Head->dataType,"List") == 0){
+			readBencode(Head->value.List_Dictionary);
+		}
+        else{
+            printf("Unable to find");
+        }
+		Head = Head->next;
+	}
+}
 
 int main(int argc, char ** argv){
-	readTorrentFile(argv[1]);
+	printf("Main");
+	/*
+	 *char BYTE_STRING;                                                           char INTEGER;                                                               char LIST;                                                                  char DICTIONARY;
+	 */
+	BencoderValues.BYTE_STRING = ' ';
+       	BencoderValues.INTEGER = 'i';
+	BencoderValues.LIST = 'l';
+	BencoderValues.DICTIONARY = 'd';
+	char *fileContent = readTorrentFile(argv[1]);	
+	lexer(fileContent);
+	free(fileContent);
 }
