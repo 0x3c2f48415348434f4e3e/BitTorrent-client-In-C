@@ -87,52 +87,6 @@ static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize) {
     return buffer;
 }
 
-
-
-//Make sure file is in current directory
-//static unsigned char* readTorrentFile(const char* filePath){
-/*static char* readTorrentFile(const char* filePath){
-	FILE *fileptr;
-	fileptr = fopen(filePath,"rb");
-	if(!fileptr){
-		//fprintf(stdout,"\nUnable to open given file\n");
-		TORRENTFILENOTFOUNDERRORLOG(filePath);
-		(*exitProgram)(-1);
-	}
-
-	//The torrent file is also known as the metainfo file
-	
-	//These files are bencoded, menaing we have to parse it out
-	//to understand the meaning
-	
-	//get the size of the file in bytes
-	fseek(fileptr,0,SEEK_END);
-	lint_16 fileSize = ftell(fileptr);
-	fseek(fileptr,0,SEEK_SET);
-	//allocate space in memory to hold content as size of file will
-	//only be known at run time
-	//unsigned char *buffer = (unsigned char *) malloc(fileSize);
-	char *buffer = (char *) malloc(fileSize+1);
-    if(buffer == NULL){
-		//memory allocation failed
-		MALLOCALLOCATIONERROR();
-		(*exitProgram)(-1);
-	}
-	//buffer
-	lint_16 readSize = fread(buffer,1,fileSize,fileptr);
-    buffer[fileSize] = '\0';
-	assert(readSize == fileSize);
-	//printf("\n%s\n",buffer);
-	printf("\nRead Size = %li, File Size = %li\n",readSize,fileSize);
-	printf("\n%lu\n",sizeof(buffer));
-    printf("%s\n",buffer);
-    printf("\nReading. Hold on first%c\n",buffer[readSize-2]);
-	//BencoderReader(buffer);
-	//free(buffer);
-	fclose(fileptr);
-	return buffer;
-}
-*/
 static int compare(const char* string){
 
 	
@@ -153,14 +107,9 @@ static void FAILUREEXIT(int errorCode){
 }
 
 
-//static void lexer(const char *stream) {
+static void lexer(const char *stream) {
     //check if the string is not end
-    //lint_16 counter = 0;
-    //printf("%s",buffer);
-    //for(;*(stream+counter)!='\0';counter++){
-        //printf("%c",*(stream+counter));
-    //}
-    /*bencodeParser *Head = NULL;
+    bencodeParser *Head = NULL;
     bencodeParser *Tail = NULL;
     
     lint_16 pointer = 0; // points to beginning of first character in stream
@@ -268,8 +217,8 @@ static void FAILUREEXIT(int errorCode){
 
     free(element);
     free(lexerResult);
-    */
-//}
+    
+}
 
 
 static int stringToInteger(const char *string) {
