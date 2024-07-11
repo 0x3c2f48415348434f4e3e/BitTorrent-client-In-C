@@ -5,7 +5,7 @@
 #include<string.h>
 
 typedef unsigned long int lint_16;
-#define BUFFER 2028
+#define BUFFER 1024
 #define TORRENTFILENOTFOUNDERRORLOG(...) {printf("In file %s, given file not found: %s\n",__FILE__,__VA_ARGS__);}
 #define MALLOCALLOCATIONERROR(...) {printf("In file %s, Memory allocation failed",__FILE__);}
 
@@ -39,20 +39,61 @@ typedef struct B {
 
 Bencoder BencoderValues;
 
-static char* readTorrentFile(const char* filePath);
-static int compare(char* string);
+//static unsigned char* readTorrentFile(const char* filePath);
+static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize);
+static int compare(const char* string);
 static void FAILUREEXIT(int errorCode);
-static void lexer(char *stream);
-static int stringToInteger(char *string);
-static char* subString(char *string, lint_16 pointer);
+static void lexer(const unsigned char *stream);
+static int stringToInteger(const char *string);
+static char* subString(const char *string, lint_16 pointer);
 static void readBencode(bencodeParser *Head);	
+static void isValidTorrent(const char * fileExtension);
 
+//due to the way that the printf() method works in c in
+//regards ti handling null terminating characters, we will
+//create our custom own
+static void printBuffer(const unsigned char* buffer, lint_16 size);
 void (*exitProgram)(int) = &FAILUREEXIT;
 
+
+static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize) {
+    FILE *fileptr = fopen(filePath, "rb"); // Open file in binary mode
+    if (!fileptr) {
+        TORRENTFILENOTFOUNDERRORLOG(filePath);
+        (*exitProgram)(-1);
+    }
+
+    fseek(fileptr, 0, SEEK_END);
+    *fileSize = ftell(fileptr);
+    //check if ftell returns -1
+    fseek(fileptr, 0, SEEK_SET);
+
+    unsigned char *buffer = (unsigned char *)malloc(*fileSize + 1); // Allocate extra space for null terminator
+    if (buffer == NULL) {
+        MALLOCALLOCATIONERROR();
+        fclose(fileptr);
+        (*exitProgram)(-1);
+    }
+    memset(buffer,0,sizeof(char)*(*fileSize+1));
+
+    lint_16 readSize = fread(buffer, 1, *fileSize, fileptr);
+    //check if fread return -1
+
+    buffer[*fileSize] = '\0'; // Null-terminate the buffer
+    assert(readSize == *fileSize);
+
+  
+    fclose(fileptr);
+    return buffer;
+}
+
+
+
 //Make sure file is in current directory
-static char* readTorrentFile(const char* filePath){
+//static unsigned char* readTorrentFile(const char* filePath){
+/*static char* readTorrentFile(const char* filePath){
 	FILE *fileptr;
-	fileptr = fopen(filePath,"r");
+	fileptr = fopen(filePath,"rb");
 	if(!fileptr){
 		//fprintf(stdout,"\nUnable to open given file\n");
 		TORRENTFILENOTFOUNDERRORLOG(filePath);
@@ -60,52 +101,51 @@ static char* readTorrentFile(const char* filePath){
 	}
 
 	//The torrent file is also known as the metainfo file
-	/*
-	These files are bencoded, menaing we have to parse it out
-	to understand the meaning
-	*/
+	
+	//These files are bencoded, menaing we have to parse it out
+	//to understand the meaning
+	
 	//get the size of the file in bytes
 	fseek(fileptr,0,SEEK_END);
 	lint_16 fileSize = ftell(fileptr);
 	fseek(fileptr,0,SEEK_SET);
 	//allocate space in memory to hold content as size of file will
 	//only be known at run time
-	char *buffer = (char *) malloc(fileSize);
-	if(buffer == NULL){
+	//unsigned char *buffer = (unsigned char *) malloc(fileSize);
+	char *buffer = (char *) malloc(fileSize+1);
+    if(buffer == NULL){
 		//memory allocation failed
 		MALLOCALLOCATIONERROR();
 		(*exitProgram)(-1);
 	}
 	//buffer
 	lint_16 readSize = fread(buffer,1,fileSize,fileptr);
-	//check if we read everything
-	/*if(readSize != fileSize){
-		fprintf(stdin,"\nCould not read the contents\n");
-		exit(-1);
-	}*/
+    buffer[fileSize] = '\0';
 	assert(readSize == fileSize);
 	//printf("\n%s\n",buffer);
-	//printf("\nRead Size = %li, File Size = %li\n",readSize,fileSize);
-	//printf("\n%lu\n",sizeof(buffer));
+	printf("\nRead Size = %li, File Size = %li\n",readSize,fileSize);
+	printf("\n%lu\n",sizeof(buffer));
+    printf("%s\n",buffer);
+    printf("\nReading. Hold on first%c\n",buffer[readSize-2]);
 	//BencoderReader(buffer);
 	//free(buffer);
 	fclose(fileptr);
 	return buffer;
 }
+*/
+static int compare(const char* string){
 
-static int compare(char* string){
-
-	/*
-	 * Will return:
-	 * 1 for string
-	 * 2 for integer
-	 * 3 for List and dictionary
-	 */
+	
+	// * Will return:
+	// * 1 for string
+	// * 2 for integer
+	// * 3 for List and dictionary
+	// *
     
 	if(strcmp(string,"String") == 0) return 1;
 	if(strcmp(string,"Integer") == 0) return 2;
 	if((strcmp(string,"List") == 0) || (strcmp(string,"Dictionary") == 0)) return 3;
-    (*exitProgram)(-1);; //for some error
+    return -1;
 }
 
 static void FAILUREEXIT(int errorCode){
@@ -113,9 +153,14 @@ static void FAILUREEXIT(int errorCode){
 }
 
 
-static void lexer(char *stream) {
+//static void lexer(const char *stream) {
     //check if the string is not end
-    bencodeParser *Head = NULL;
+    //lint_16 counter = 0;
+    //printf("%s",buffer);
+    //for(;*(stream+counter)!='\0';counter++){
+        //printf("%c",*(stream+counter));
+    //}
+    /*bencodeParser *Head = NULL;
     bencodeParser *Tail = NULL;
     
     lint_16 pointer = 0; // points to beginning of first character in stream
@@ -202,7 +247,7 @@ static void lexer(char *stream) {
             lexer(stream + pointer);
         }
         *(lexerResult+pointer2) = '\0';
-        printf("Moving across %s\n",lexerResult);
+        //printf("Moving across %s\n",lexerResult);
         element->value.stringValue = lexerResult;
 
     }
@@ -223,9 +268,11 @@ static void lexer(char *stream) {
 
     free(element);
     free(lexerResult);
-}
+    */
+//}
 
-static int stringToInteger(char *string) {
+
+static int stringToInteger(const char *string) {
     int res = 0;
     for (int i = 0; string[i] != '\0'; i++) {
         res = (res * 10) + (string[i] - '0');
@@ -233,7 +280,7 @@ static int stringToInteger(char *string) {
     return res;
 }
 
-static char* subString(char *string, lint_16 pointer) {
+static char* subString(const char *string, lint_16 pointer) {
     char *result = (char *) malloc(sizeof(char) * BUFFER);
     if (result == NULL) {
         fprintf(stderr, "Unable to initialise memory");
@@ -278,18 +325,42 @@ static void readBencode(bencodeParser *Head){
     return;
 }
 
+static void printBuffer(const unsigned char* buffer, lint_16 size){
+    lint_16 counter = 0;
+    for(; counter<size; counter++){
+        //Looking at the ASCII table
+        //we want to ignore character less than 32
+        if(buffer[counter] >= 32 && buffer[counter] <= 126){
+            putchar(buffer[counter]);
+        }
+        else{
+            //buffer[counter] = ' ';
+            printf("\\x%02x", buffer[counter]);
+            //putchar()
+        }
+       
+    }
+    printf("\n");
+}
+
+
 int main(int argc, char ** argv){
-	/*
-	 *char BYTE_STRING;                                                           
-     char INTEGER;                                                               
-     char LIST;                                                                  
-     char DICTIONARY;
-	 */
+	
+	// *char BYTE_STRING;                                                           
+    // char INTEGER;                                                               
+    // char LIST;                                                                  
+    // char DICTIONARY;
+	 
 	BencoderValues.BYTE_STRING = ' ';
-       	BencoderValues.INTEGER = 'i';
+    BencoderValues.INTEGER = 'i';
 	BencoderValues.LIST = 'l';
 	BencoderValues.DICTIONARY = 'd';
-	char *fileContent = readTorrentFile(argv[1]);	
-	lexer(fileContent);
-	free(fileContent);
+	//unsigned char *fileContent = readTorrentFile(argv[1]);
+    lint_16 fileSize;	
+    const unsigned char *fileContent = readTorrentFile((const char*) argv[1], &fileSize);
+    printBuffer(fileContent,fileSize);
+	//lexer(fileContent);
+    //printf("\n%s",fileContent);
+    printf("\nFinal");
+	free((void *) fileContent);
 }
