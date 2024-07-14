@@ -43,7 +43,7 @@ Bencoder BencoderValues;
 static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize);
 static int compare(const char* string);
 static void FAILUREEXIT(int errorCode);
-static void lexer(const unsigned char *stream);
+static lint_16 lexer(const unsigned char *stream);
 static int stringToInteger(unsigned char *string);
 static char* subString(const char *string, lint_16 pointer);
 static void readBencode(bencodeParser *Head);	
@@ -54,6 +54,7 @@ static void isValidTorrent(const char * fileExtension);
 //create our custom own
 static void printBuffer(const unsigned char* buffer, lint_16 size);
 void (*exitProgram)(int) = &FAILUREEXIT;
+
 
 
 static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize) {
@@ -106,120 +107,89 @@ static void FAILUREEXIT(int errorCode){
 	exit(errorCode);
 }
 
-static void lexer(const unsigned char *stream) {
-    printf("Lexer: %s\n",stream);
-    //check if the string is not end
-    bencodeParser *Head = NULL;
-    bencodeParser *Tail = NULL;
-    
+//What we will actually do is that within the 
+//integer and string part
+// we will not add anny recursion
+//insted we return the pointer to the 
+//call function in the List/Dictionary
+//then add that returned poiunter to the
+//pointer in the List/Dictionary
+
+bencodeParser *Head = NULL;
+bencodeParser *Tail = NULL;
+
+static lint_16 lexer(const unsigned char *stream) {
+    //printf("%s\n",stream);
     lint_16 pointer = 0; // points to beginning of first character in stream
     lint_16 pointer2 = 0; // allow us to navigate out final string result
     unsigned char *lexerResult = (unsigned char *) malloc(sizeof(char) * BUFFER);
-    // check if memory allocation was successful
     if (lexerResult == NULL) {
         fprintf(stderr, "Unable to initialise memory");
         (*exitProgram)(-1);
     }
-    
+
     bencodeParser *element = (bencodeParser *) malloc(sizeof(bencodeParser));
-    // check if memory allocation was successful
-    if(element == NULL){
+    if (element == NULL) {
         fprintf(stderr, "Unable to initialise memory");
         (*exitProgram)(-1);
     }
     element->next = NULL;
-    
 
-        if (*(stream + pointer) == BencoderValues.INTEGER) {
-	        strcpy(element->dataType,"Integer");
-	        //make a node here for the INTEGER value
-
-            pointer++;//skip the i
-            //check for negative
-            while (*(stream + pointer) != 'e') {
-                *(lexerResult + pointer2) = *(stream + pointer);
-                pointer++;
-                pointer2++;
-            }
-            *(lexerResult+pointer2) = '\0';
-            element->value.integerValue = stringToInteger(lexerResult);
-
-        } else if (*(stream + pointer) == BencoderValues.LIST) {
-            strcpy(element->dataType,"List");
-            pointer++;//skip the l
-            while (*(stream + pointer) != 'e') {
-                //list can have nested data structures so we accompany for that
-	            if (*(stream + pointer) == BencoderValues.INTEGER || *(stream + pointer) == BencoderValues.LIST || *(stream + pointer) == BencoderValues.DICTIONARY){
-                    lexer(stream + pointer);
-        	        while (*(stream + pointer) != 'e'){
-			            pointer++; //move pointer to final position of e
-                    }
-                } else {
-                    unsigned char num[1000] = {0};
-                    int tempPoint = 0;
-                    while (*(stream + pointer) != ':') {
-			            num[tempPoint] = *(stream + pointer);
-                        tempPoint++;
-                        pointer++;
-                    }
-                    int lengthOfString = stringToInteger(num);
-                    pointer++; //skip colon
-                    for (int i = 0; i < lengthOfString; i++) {
-                        *(lexerResult + pointer2++) = *(stream + pointer++);
-                    }
-                }
-            }
-            //pointer++; // Skip 'e'
-        } else if (*(stream + pointer) == BencoderValues.DICTIONARY) {
-            strcpy(element->dataType,"Dictionary");
-    
-            pointer++;
-            while (*(stream + pointer) != 'e') {
-                lexer(stream + pointer);
-                while (*(stream + pointer) != 'e') pointer++;
-            }
-            pointer++; // Skip 'e'
-        } else {
-            strcpy(element->dataType,"String");
-            unsigned char num[1000] = {0};
-            int tempPoint = 0;
-            while (*(stream + pointer) != ':') {
-                num[tempPoint] = *(stream + pointer);
-                tempPoint++;
-                pointer++;
-            }
-            int lengthOfString = stringToInteger(num);
-            pointer++;
-            for (int i = 0; i < lengthOfString; i++) {
-                *(lexerResult + pointer2++) = *(stream + pointer++);
-            }
-            if (*(stream + pointer) != '\0') {
-                lexer(stream + pointer);
-            }
-            *(lexerResult+pointer2) = '\0';
-            //printf("Moving across %s\n",lexerResult);
-            element->value.stringValue = lexerResult;
-
+    if (stream[pointer] == BencoderValues.INTEGER) {
+        strcpy(element->dataType, "Integer");
+        pointer++; // skip 'i'
+        while (stream[pointer] != 'e') {
+            lexerResult[pointer2++] = stream[pointer++];
         }
-
-        if(Head == NULL){
-            //linked list is empty
-	        Head = element;
-            Tail = element;
+        lexerResult[pointer2] = '\0';
+        element->value.integerValue = stringToInteger(lexerResult);
+        pointer++; // skip 'e'
+    } else if (stream[pointer] == BencoderValues.LIST) {
+        //Will add all nested children before adding List
+        strcpy(element->dataType, "List");
+        pointer++; // skip 'l'
+        while (stream[pointer] != 'e') {
+            pointer += lexer(stream + pointer);
         }
-        else{
-            //We have stuff in our linked list
-            //for our linked list, think of it like a snake, that is the head will always stay in the same position and the body/tail will grow
-            Tail->next = element;
-            Tail = element;
+        pointer++; // skip 'e'
+    } else if (stream[pointer] == BencoderValues.DICTIONARY) {
+        //Will add all nested children before adding Dictionary
+        strcpy(element->dataType, "Dictionary");
+        pointer++; // skip 'd'
+        while (stream[pointer] != 'e') {
+            pointer += lexer(stream + pointer);
         }
-   
-	
-    readBencode(Head);
+        pointer++; // skip 'e'
+    } else {
+        strcpy(element->dataType, "String");
+        unsigned char num[1000] = {0};
+        int tempPoint = 0;
+        while (stream[pointer] != ':') {
+            num[tempPoint++] = stream[pointer++];
+        }
+        num[tempPoint] = '\0';
+        int lengthOfString = stringToInteger(num);
+        pointer++; // skip ':'
+        element->value.stringValue = (unsigned char *)malloc((lengthOfString + 1) * sizeof(unsigned char));
+        if (element->value.stringValue == NULL) {
+            fprintf(stderr, "Unable to initialise memory");
+            (*exitProgram)(-1);
+        }
+        memcpy(element->value.stringValue, &stream[pointer], lengthOfString);
+        element->value.stringValue[lengthOfString] = '\0';
+        pointer += lengthOfString;
+    }
 
-    free(element);
+    if (Head == NULL) {
+        Head = element;
+        Tail = element;
+    } else {
+        Tail->next = element;
+        Tail = element;
+    }
+
     free(lexerResult);
-    
+    return pointer;
 }
 
 
@@ -258,7 +228,7 @@ static char* subString(const char *string, lint_16 pointer) {
 
 static void readBencode(bencodeParser *Head){
 	while(Head){
-        //printf("\n%s\n",Head->dataType);
+        printf("\n%s\n",Head->dataType);
 		if(compare(Head->dataType) == 1){
 			printf("%s\n",Head->value.stringValue);
 		}
@@ -294,7 +264,6 @@ static void printBuffer(const unsigned char* buffer, lint_16 size){
 
 
 int main(int argc, char ** argv){
-	printf("ok\n");
 	// *char BYTE_STRING;                                                           
     // char INTEGER;                                                               
     // char LIST;                                                                  
@@ -321,12 +290,15 @@ int main(int argc, char ** argv){
             tempFileContent[counter] = fileContent[counter];
         }
         else{
-            tempFileContent[counter] = '1';
+            tempFileContent[counter] = '1'; //replace useless chracters with a 1
         }
     }
-    //printf("%s\n",tempFileContent);
-	lexer(tempFileContent);
+    
+	//lexer(tempFileContent);
+
+    lint_16 pointer = lexer(tempFileContent);
     //printf("\n%s",fileContent);
+    readBencode(Head);
     free(tempFileContent);
 	free((void *) fileContent);
 }
