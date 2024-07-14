@@ -4,10 +4,11 @@
 #include<stddef.h>
 #include<string.h>
 
-typedef unsigned long int lint_16;
+//will comment a lot, as this is just what i like to do
+typedef unsigned long int lint_16; // allow for more values to be represented
 #define BUFFER 1024
-#define TORRENTFILENOTFOUNDERRORLOG(...) {printf("In file %s, given file not found: %s\n",__FILE__,__VA_ARGS__);}
-#define MALLOCALLOCATIONERROR(...) {printf("In file %s, Memory allocation failed",__FILE__);}
+#define TORRENTFILENOTFOUNDERRORLOG(...) {printf("In file %s, line %i, given file not found: %s\n", __FILE__, __LINE__, __VA_ARGS__);}
+#define MALLOCALLOCATIONERROR(...) {printf("In file %s, line %i, Memory allocation failed: %s", __FILE__, __LINE__, __VA_ARGS__);}
 
 //not really necessary but why not. Could have used Enums
 typedef struct{
@@ -39,8 +40,7 @@ typedef struct B {
 
 Bencoder BencoderValues;
 
-//static unsigned char* readTorrentFile(const char* filePath);
-static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize);
+static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize); //function declearation for reading file
 static int compare(const char* string);
 static void FAILUREEXIT(int errorCode);
 static lint_16 lexer(const unsigned char *stream);
@@ -48,6 +48,7 @@ static int stringToInteger(unsigned char *string);
 static char* subString(const char *string, lint_16 pointer);
 static void readBencode(bencodeParser *Head);	
 static void isValidTorrent(const char * fileExtension);
+static int compareStrings(const char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
 
 //due to the way that the printf() method works in c in
 //regards ti handling null terminating characters, we will
@@ -55,9 +56,49 @@ static void isValidTorrent(const char * fileExtension);
 static void printBuffer(const unsigned char* buffer, lint_16 size);
 void (*exitProgram)(int) = &FAILUREEXIT;
 
+static int compareStrings(const char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2){
+    //have an int to represent true or false
+    //0 is false
+    //1 is true
+    int valid = 1;
+    while(lenOfFileExtension){
+        if(str1[pointerForStr1] != str2[pointerForStr2]){
+            valid = 0;
+            return valid;
+        }
+        //remeber we are passing pointerForStr1 and pointerForStr2 by value so chnages we make here will not affect the actual value we pass to the function
+        pointerForStr1++;
+        pointerForStr2++;
+    }
+    return valid;
+}
 
+static void isValidTorrent(const char * fileExtension){
+    //will check weather given file is a valide torrent file based solely on the file extension, otherwise, we exit
+    const char *torrentName = ".torrent";
+    //get the last .
+    int lastPeriodCharacter = 0;
+    int pointer = 0;
+    while(*(fileExtension+pointer) !=  '\0'){
+        //check if we have a period (use ASCII, more safer, i think)
+        if(*(fileExtension+pointer) == 46){
+            lastPeriodCharacter = pointer;
+        }
+        pointer++;
+    }
+    //since we have the last period, check the extension
+    int str2Pointer = 0;
+    if(compareStrings(fileExtension,torrentName,strlen(torrentName),lastPeriodCharacter,str2Pointer) == 1){
+        printf("Valid File extension\n");
+    }
+    else{
+        printf("Invalid File Extension\n");
+        (*exitProgram)(-1);
+    }
+}
 
 static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize) {
+    isValidTorrent(filePath);
     FILE *fileptr = fopen(filePath, "rb"); // Open file in binary mode
     if (!fileptr) {
         TORRENTFILENOTFOUNDERRORLOG(filePath);
@@ -71,7 +112,7 @@ static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize) {
 
     unsigned char *buffer = (unsigned char *)malloc(*fileSize + 1); // Allocate extra space for null terminator
     if (buffer == NULL) {
-        MALLOCALLOCATIONERROR();
+        MALLOCALLOCATIONERROR("Varibale buffer could not be allocated");
         fclose(fileptr);
         (*exitProgram)(-1);
     }
@@ -124,13 +165,13 @@ static lint_16 lexer(const unsigned char *stream) {
     lint_16 pointer2 = 0; // allow us to navigate out final string result
     unsigned char *lexerResult = (unsigned char *) malloc(sizeof(char) * BUFFER);
     if (lexerResult == NULL) {
-        fprintf(stderr, "Unable to initialise memory");
+        MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
         (*exitProgram)(-1);
     }
 
     bencodeParser *element = (bencodeParser *) malloc(sizeof(bencodeParser));
     if (element == NULL) {
-        fprintf(stderr, "Unable to initialise memory");
+        MALLOCALLOCATIONERROR("Varibale element could not be allocated");
         (*exitProgram)(-1);
     }
     element->next = NULL;
@@ -168,11 +209,12 @@ static lint_16 lexer(const unsigned char *stream) {
             num[tempPoint++] = stream[pointer++];
         }
         num[tempPoint] = '\0';
+        //get length of string and allocate memeory using that length
         int lengthOfString = stringToInteger(num);
         pointer++; // skip ':'
         element->value.stringValue = (unsigned char *)malloc((lengthOfString + 1) * sizeof(unsigned char));
         if (element->value.stringValue == NULL) {
-            fprintf(stderr, "Unable to initialise memory");
+            MALLOCALLOCATIONERROR("Varibale element->value.stringValue could not be allocated");
             (*exitProgram)(-1);
         }
         memcpy(element->value.stringValue, &stream[pointer], lengthOfString);
@@ -204,8 +246,8 @@ static int stringToInteger(unsigned char *string) {
 static char* subString(const char *string, lint_16 pointer) {
     char *result = (char *) malloc(sizeof(char) * BUFFER);
     if (result == NULL) {
-        fprintf(stderr, "Unable to initialise memory");
-        exit(-1);
+        MALLOCALLOCATIONERROR("Varibale result could not be allocated");
+        (*exitProgram)(-1);
     }
     int i = 0;
     int currentBufferSize = BUFFER;
@@ -279,8 +321,8 @@ int main(int argc, char ** argv){
     //printBuffer(fileContent,fileSize);
     unsigned char *tempFileContent = (unsigned char *)  malloc(sizeof(char)*fileSize);
     if(tempFileContent == NULL){
-        fprintf(stderr, "Unable to initialise memory");
-        (*exitProgram)(-1);;
+        MALLOCALLOCATIONERROR("Varibale tempFileContent could not be allocated");
+        (*exitProgram)(-1);
     }
 
     lint_16 counter = 0;
@@ -294,7 +336,6 @@ int main(int argc, char ** argv){
         }
     }
     
-	//lexer(tempFileContent);
 
     lint_16 pointer = lexer(tempFileContent);
     //printf("\n%s",fileContent);
