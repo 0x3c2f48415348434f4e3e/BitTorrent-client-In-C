@@ -50,6 +50,8 @@ static void readBencode(bencodeParser *Head);
 static void isValidTorrent(const char * fileExtension);
 static int compareStrings(const char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
 
+static void requestTracker();
+
 //due to the way that the printf() method works in c in
 //regards ti handling null terminating characters, we will
 //create our custom own
@@ -63,13 +65,16 @@ static int compareStrings(const char* str1, const char* str2, int lenOfFileExten
     int valid = 1;
     while(lenOfFileExtension){
         if(str1[pointerForStr1] != str2[pointerForStr2]){
+            printf("Checking\n");
             valid = 0;
             return valid;
         }
         //remeber we are passing pointerForStr1 and pointerForStr2 by value so chnages we make here will not affect the actual value we pass to the function
         pointerForStr1++;
         pointerForStr2++;
+        lenOfFileExtension--;
     }
+
     return valid;
 }
 
@@ -302,6 +307,11 @@ static void printBuffer(const unsigned char* buffer, lint_16 size){
        
     }
     printf("\n");
+}
+
+//So what we have to do next, is get the value of the annouce (As this is the URL of trh tracker)
+static void requestTracker(){
+
 }
 
 
