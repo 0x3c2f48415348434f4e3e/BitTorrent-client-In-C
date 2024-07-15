@@ -44,12 +44,15 @@ static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize); 
 static int compare(const char* string);
 static void FAILUREEXIT(int errorCode);
 static lint_16 lexer(const unsigned char *stream);
+//will just copy the above function function and make just a small chnage
+static lint_16 returnINFORDICTIONARYPOINTER(const unsigned char *stream);
 static int stringToInteger(unsigned char *string);
 static char* subString(const char *string, lint_16 pointer);
 static void readBencode(bencodeParser *Head);	
 static void isValidTorrent(const char * fileExtension);
 static int compareStrings(const char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
 
+static void SHA1();
 static void requestTracker();
 
 //due to the way that the printf() method works in c in
@@ -65,7 +68,6 @@ static int compareStrings(const char* str1, const char* str2, int lenOfFileExten
     int valid = 1;
     while(lenOfFileExtension){
         if(str1[pointerForStr1] != str2[pointerForStr2]){
-            printf("Checking\n");
             valid = 0;
             return valid;
         }
@@ -185,6 +187,16 @@ static lint_16 lexer(const unsigned char *stream) {
         strcpy(element->dataType, "Integer");
         pointer++; // skip 'i'
         while (stream[pointer] != 'e') {
+            //check if pointer2(which is used for lexerResult surpasses BUFFER which is the allocated Buffer for lexerResult, if true realloc)
+            lint_16 currentBufferSize = BUFFER;
+            if ((pointer2) >= currentBufferSize) {
+                currentBufferSize += BUFFER;
+                lexerResult = (unsigned char *) realloc(lexerResult, currentBufferSize);
+                if (lexerResult == NULL) {
+                    MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
+                    (*exitProgram)(-1);
+                }
+            }
             lexerResult[pointer2++] = stream[pointer++];
         }
         lexerResult[pointer2] = '\0';
@@ -309,8 +321,105 @@ static void printBuffer(const unsigned char* buffer, lint_16 size){
     printf("\n");
 }
 
+
+//Yes i know this is very bad as we ca just make changes to the orginal function, but trying to do it another way will take way too long
+static lint_16 returnINFORDICTIONARYPOINTER(const unsigned char *stream){
+    //printf("%s\n",stream);
+    lint_16 pointer = 0; // points to beginning of first character in stream
+    lint_16 pointer2 = 0; // allow us to navigate out final string result
+    char *INFODICT = "info";
+    unsigned char *lexerResult = (unsigned char *) malloc(sizeof(char) * BUFFER);
+    if (lexerResult == NULL) {
+        MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
+        (*exitProgram)(-1);
+    }
+
+    if (stream[pointer] == BencoderValues.INTEGER) {
+        strcpy(element->dataType, "Integer");
+        pointer++; // skip 'i'
+        while (stream[pointer] != 'e') {
+            //check if pointer2(which is used for lexerResult surpasses BUFFER which is the allocated Buffer for lexerResult, if true realloc)
+            lint_16 currentBufferSize = BUFFER;
+            if ((pointer2) >= currentBufferSize) {
+                currentBufferSize += BUFFER;
+                lexerResult = (unsigned char *) realloc(lexerResult, currentBufferSize);
+                if (lexerResult == NULL) {
+                    MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
+                    (*exitProgram)(-1);
+                }
+            }
+            lexerResult[pointer2++] = stream[pointer++];
+        }
+        lexerResult[pointer2] = '\0';
+        element->value.integerValue = stringToInteger(lexerResult);
+        pointer++; // skip 'e'
+    } else if (stream[pointer] == BencoderValues.LIST) {
+        //Will add all nested children before adding List
+        strcpy(element->dataType, "List");
+        pointer++; // skip 'l'
+        while (stream[pointer] != 'e') {
+            pointer += lexer(stream + pointer);
+        }
+        pointer++; // skip 'e'
+    } else if (stream[pointer] == BencoderValues.DICTIONARY) {
+        //Will add all nested children before adding Dictionary
+        strcpy(element->dataType, "Dictionary");
+        pointer++; // skip 'd'
+        while (stream[pointer] != 'e') {
+            pointer += lexer(stream + pointer);
+        }
+        pointer++; // skip 'e'
+    } else {
+        strcpy(element->dataType, "String");
+        unsigned char num[1000] = {0};
+        int tempPoint = 0;
+        while (stream[pointer] != ':') {
+            num[tempPoint++] = stream[pointer++];
+        }
+        num[tempPoint] = '\0';
+        //get length of string and allocate memeory using that length
+        int lengthOfString = stringToInteger(num);
+        pointer++; // skip ':'
+        pointer += lengthOfString;
+
+        //check if string is the same as info
+        compareStrings(); //finish
+    }
+
+    free(lexerResult);
+    return pointer;
+}
+
+//SHA-1 algorithm implementation
+static void SHA1(char *infoDictionary){
+/*
+What we do here is take as input the info dictionary
+without decoding it from the bencode format. then
+we use the SHA1 format
+
+What we will do first is find the position of the info dict within the infoDictionary input
+*/
+
+}
+
 //So what we have to do next, is get the value of the annouce (As this is the URL of trh tracker)
 static void requestTracker(){
+/*To build an apporiate request, there
+are several things to keep in mind
+1. Get a socket up to do the request
+2. make sure the request url has all the necessary
+parameters including:
+a. info_hash - Need to use SHA1 algorithm. What this
+does is takes an input and produces a fixed size
+string of byte.
+b. peer_id
+c. uploaded
+d. downloaded
+e. left
+f. port
+g. compact
+*/
+
 
 }
 
@@ -328,7 +437,7 @@ int main(int argc, char ** argv){
 	//unsigned char *fileContent = readTorrentFile(argv[1]);
     lint_16 fileSize;	
     const unsigned char *fileContent = readTorrentFile((const char*) argv[1], &fileSize);
-    //printBuffer(fileContent,fileSize);
+
     unsigned char *tempFileContent = (unsigned char *)  malloc(sizeof(char)*fileSize);
     if(tempFileContent == NULL){
         MALLOCALLOCATIONERROR("Varibale tempFileContent could not be allocated");
