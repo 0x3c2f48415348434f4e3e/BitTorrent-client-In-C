@@ -44,13 +44,13 @@ static unsigned char* readTorrentFile(const char* filePath, lint_16 *fileSize); 
 static int compare(const char* string);
 static void FAILUREEXIT(int errorCode);
 static lint_16 lexer(const unsigned char *stream);
-//will just copy the above function function and make just a small chnage
-static lint_16 returnINFORDICTIONARYPOINTER(const unsigned char *stream);
 static int stringToInteger(unsigned char *string);
 static char* subString(const char *string, lint_16 pointer);
 static void readBencode(bencodeParser *Head);	
 static void isValidTorrent(const char * fileExtension);
 static int compareStrings(const char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
+//The C language does not support function overloading, so lets add extremely bad code
+static int compareUnsignedStrings(const unsigned char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
 
 static void SHA1();
 static void requestTracker();
@@ -62,6 +62,26 @@ static void printBuffer(const unsigned char* buffer, lint_16 size);
 void (*exitProgram)(int) = &FAILUREEXIT;
 
 static int compareStrings(const char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2){
+    //have an int to represent true or false
+    //0 is false
+    //1 is true
+    int valid = 1;
+    while(lenOfFileExtension){
+        if(str1[pointerForStr1] != str2[pointerForStr2]){
+            valid = 0;
+            return valid;
+        }
+        //remeber we are passing pointerForStr1 and pointerForStr2 by value so chnages we make here will not affect the actual value we pass to the function
+        pointerForStr1++;
+        pointerForStr2++;
+        lenOfFileExtension--;
+    }
+
+    return valid;
+}
+
+//function overloading i guess
+static int compareUnsignedStrings(const unsigned char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2){
     //have an int to represent true or false
     //0 is false
     //1 is true
@@ -166,7 +186,23 @@ static void FAILUREEXIT(int errorCode){
 bencodeParser *Head = NULL;
 bencodeParser *Tail = NULL;
 
+
+//global varible to store position of the info dictionary
+lint_16 pointerToInfoDictioinary = 0;
+
+//global varibale to store the end of the info
+//dictionary. Since we know the structure of a
+//torrent file already that is the end of the 
+//info dictorent will be before the end of the parent 
+//dictionary
+lint_16 pointerToEndOfInfoDictionary = 0;
+
+//another global varibale to keep running, so every
+//where we increment our pointer, we also increment
+//this varibale
+lint_16 infoPointerKeepRunning = 0;
 static lint_16 lexer(const unsigned char *stream) {
+    const char *INFODICT = "info";
     //printf("%s\n",stream);
     lint_16 pointer = 0; // points to beginning of first character in stream
     lint_16 pointer2 = 0; // allow us to navigate out final string result
@@ -186,6 +222,7 @@ static lint_16 lexer(const unsigned char *stream) {
     if (stream[pointer] == BencoderValues.INTEGER) {
         strcpy(element->dataType, "Integer");
         pointer++; // skip 'i'
+        infoPointerKeepRunning++;
         while (stream[pointer] != 'e') {
             //check if pointer2(which is used for lexerResult surpasses BUFFER which is the allocated Buffer for lexerResult, if true realloc)
             lint_16 currentBufferSize = BUFFER;
@@ -198,45 +235,60 @@ static lint_16 lexer(const unsigned char *stream) {
                 }
             }
             lexerResult[pointer2++] = stream[pointer++];
+            infoPointerKeepRunning++;
         }
         lexerResult[pointer2] = '\0';
         element->value.integerValue = stringToInteger(lexerResult);
         pointer++; // skip 'e'
+        infoPointerKeepRunning++;
     } else if (stream[pointer] == BencoderValues.LIST) {
         //Will add all nested children before adding List
         strcpy(element->dataType, "List");
         pointer++; // skip 'l'
+        infoPointerKeepRunning++;
         while (stream[pointer] != 'e') {
             pointer += lexer(stream + pointer);
         }
         pointer++; // skip 'e'
+        infoPointerKeepRunning++;
     } else if (stream[pointer] == BencoderValues.DICTIONARY) {
         //Will add all nested children before adding Dictionary
         strcpy(element->dataType, "Dictionary");
         pointer++; // skip 'd'
+        infoPointerKeepRunning++;
         while (stream[pointer] != 'e') {
             pointer += lexer(stream + pointer);
         }
         pointer++; // skip 'e'
+        infoPointerKeepRunning++;
     } else {
         strcpy(element->dataType, "String");
         unsigned char num[1000] = {0};
         int tempPoint = 0;
         while (stream[pointer] != ':') {
             num[tempPoint++] = stream[pointer++];
+            infoPointerKeepRunning++;
         }
         num[tempPoint] = '\0';
         //get length of string and allocate memeory using that length
         int lengthOfString = stringToInteger(num);
         pointer++; // skip ':'
+        infoPointerKeepRunning++;
         element->value.stringValue = (unsigned char *)malloc((lengthOfString + 1) * sizeof(unsigned char));
         if (element->value.stringValue == NULL) {
             MALLOCALLOCATIONERROR("Varibale element->value.stringValue could not be allocated");
             (*exitProgram)(-1);
         }
         memcpy(element->value.stringValue, &stream[pointer], lengthOfString);
+        int str1Pointer = 0;
+        int str2Pointer = 0;
+        if(compareUnsignedStrings(element->value.stringValue,INFODICT,strlen(INFODICT),str1Pointer,str2Pointer) == 1){
+            printf("\nFound the Info Dictionary: %s\n",element->value.stringValue);
+            pointerToInfoDictioinary = infoPointerKeepRunning;
+        }
         element->value.stringValue[lengthOfString] = '\0';
         pointer += lengthOfString;
+        infoPointerKeepRunning+=lengthOfString;
     }
 
     if (Head == NULL) {
@@ -322,74 +374,6 @@ static void printBuffer(const unsigned char* buffer, lint_16 size){
 }
 
 
-//Yes i know this is very bad as we ca just make changes to the orginal function, but trying to do it another way will take way too long
-static lint_16 returnINFORDICTIONARYPOINTER(const unsigned char *stream){
-    //printf("%s\n",stream);
-    lint_16 pointer = 0; // points to beginning of first character in stream
-    lint_16 pointer2 = 0; // allow us to navigate out final string result
-    char *INFODICT = "info";
-    unsigned char *lexerResult = (unsigned char *) malloc(sizeof(char) * BUFFER);
-    if (lexerResult == NULL) {
-        MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
-        (*exitProgram)(-1);
-    }
-
-    if (stream[pointer] == BencoderValues.INTEGER) {
-        strcpy(element->dataType, "Integer");
-        pointer++; // skip 'i'
-        while (stream[pointer] != 'e') {
-            //check if pointer2(which is used for lexerResult surpasses BUFFER which is the allocated Buffer for lexerResult, if true realloc)
-            lint_16 currentBufferSize = BUFFER;
-            if ((pointer2) >= currentBufferSize) {
-                currentBufferSize += BUFFER;
-                lexerResult = (unsigned char *) realloc(lexerResult, currentBufferSize);
-                if (lexerResult == NULL) {
-                    MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
-                    (*exitProgram)(-1);
-                }
-            }
-            lexerResult[pointer2++] = stream[pointer++];
-        }
-        lexerResult[pointer2] = '\0';
-        element->value.integerValue = stringToInteger(lexerResult);
-        pointer++; // skip 'e'
-    } else if (stream[pointer] == BencoderValues.LIST) {
-        //Will add all nested children before adding List
-        strcpy(element->dataType, "List");
-        pointer++; // skip 'l'
-        while (stream[pointer] != 'e') {
-            pointer += lexer(stream + pointer);
-        }
-        pointer++; // skip 'e'
-    } else if (stream[pointer] == BencoderValues.DICTIONARY) {
-        //Will add all nested children before adding Dictionary
-        strcpy(element->dataType, "Dictionary");
-        pointer++; // skip 'd'
-        while (stream[pointer] != 'e') {
-            pointer += lexer(stream + pointer);
-        }
-        pointer++; // skip 'e'
-    } else {
-        strcpy(element->dataType, "String");
-        unsigned char num[1000] = {0};
-        int tempPoint = 0;
-        while (stream[pointer] != ':') {
-            num[tempPoint++] = stream[pointer++];
-        }
-        num[tempPoint] = '\0';
-        //get length of string and allocate memeory using that length
-        int lengthOfString = stringToInteger(num);
-        pointer++; // skip ':'
-        pointer += lengthOfString;
-
-        //check if string is the same as info
-        compareStrings(); //finish
-    }
-
-    free(lexerResult);
-    return pointer;
-}
-
 //SHA-1 algorithm implementation
 static void SHA1(char *infoDictionary){
 /*
@@ -399,6 +383,7 @@ we use the SHA1 format
 
 What we will do first is find the position of the info dict within the infoDictionary input
 */
+    printf("Testing");
 
 }
 
@@ -457,8 +442,25 @@ int main(int argc, char ** argv){
     
 
     lint_16 pointer = lexer(tempFileContent);
-    //printf("\n%s",fileContent);
-    readBencode(Head);
+    pointerToEndOfInfoDictionary = pointer;
+    //subtract twice as the info is nested inside the parent
+    //dictionary;
+    pointerToEndOfInfoDictionary-=2;
+
+    //readBencode(Head);
+
+    /*
+    //Debugging
+    printf("\nPointer to info Dict is: %li\n",pointerToInfoDictioinary);
+    printf("\n%c",fileContent[pointerToInfoDictioinary]);
+    printf("\n%c",fileContent[pointerToInfoDictioinary+1]);
+    printf("\n%c",fileContent[pointerToInfoDictioinary+2]);
+    printf("\n%c",fileContent[pointerToInfoDictioinary+3]);
+    
+    printf("\nEnd of info Dictionary is: %li\n", pointerToEndOfInfoDictionary);
+    printf("\n%c",fileContent[pointerToEndOfInfoDictionary]);
+    printf("\n%s",fileContent);
+    */
     free(tempFileContent);
 	free((void *) fileContent);
 }
