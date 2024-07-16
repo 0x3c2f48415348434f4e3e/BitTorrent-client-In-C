@@ -442,13 +442,37 @@ int main(int argc, char ** argv){
     
 
     lint_16 pointer = lexer(tempFileContent);
-    pointerToEndOfInfoDictionary = pointer;
+    pointerToEndOfInfoDictionary = fileSize;
+    printf("\nPointer: %ld\n",pointer);
+    printf("\nfileSize: %ld\n",fileSize);
+    printf("\npointerToEndOfInfoDictioinary: %ld\n", pointerToEndOfInfoDictionary);
+    printf("\npointertoInfoDictionary: %ld\n", pointerToInfoDictioinary);
     //subtract twice as the info is nested inside the parent
     //dictionary;
     pointerToEndOfInfoDictionary-=2;
 
+    //lint_16 calculateResultant = pointerToEndOfInfoDictionary-pointerToInfoDictioinary;
+    printf("\nstuff: %ld\n", (pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
+    unsigned char *info_hash = (unsigned char*) malloc(sizeof(char)*(pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
+    //check for allocation failure
+        if (info_hash == NULL) {
+            MALLOCALLOCATIONERROR("Varibale element->value.stringValue could not be allocated");
+            (*exitProgram)(-1);
+        }
+
     //readBencode(Head);
 
+    lint_16 copyOfPointerToInfoDictionary = pointerToInfoDictioinary;
+    lint_16 counterInfo_hash = 0;
+
+    for(; counterInfo_hash<=(pointerToEndOfInfoDictionary-pointerToInfoDictioinary); counterInfo_hash++, copyOfPointerToInfoDictionary++){
+        *(info_hash+counterInfo_hash) =  *(fileContent+copyOfPointerToInfoDictionary);
+    }
+
+    //major memory issue
+    printf("Last Character: %c, %ld",*(info_hash+((pointerToEndOfInfoDictionary-pointerToInfoDictioinary))), (pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
+
+    printf("\n%s\n",info_hash);
     /*
     //Debugging
     printf("\nPointer to info Dict is: %li\n",pointerToInfoDictioinary);
@@ -461,6 +485,7 @@ int main(int argc, char ** argv){
     printf("\n%c",fileContent[pointerToEndOfInfoDictionary]);
     printf("\n%s",fileContent);
     */
+    free(info_hash);
     free(tempFileContent);
 	free((void *) fileContent);
 }
