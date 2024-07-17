@@ -52,7 +52,7 @@ static int compareStrings(const char* str1, const char* str2, int lenOfFileExten
 //The C language does not support function overloading, so lets add extremely bad code
 static int compareUnsignedStrings(const unsigned char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
 
-static void SHA1();
+static void SHA1(const unsigned char *infoDictionary, lint_16 size);
 static void requestTracker();
 
 //due to the way that the printf() method works in c in
@@ -375,7 +375,7 @@ static void printBuffer(const unsigned char* buffer, lint_16 size){
 
 
 //SHA-1 algorithm implementation
-static void SHA1(char *infoDictionary){
+static void SHA1(const unsigned char *infoDictionary, lint_16 size){
 /*
 What we do here is take as input the info dictionary
 without decoding it from the bencode format. then
@@ -383,7 +383,7 @@ we use the SHA1 format
 
 What we will do first is find the position of the info dict within the infoDictionary input
 */
-    printf("Testing");
+    printBuffer(infoDictionary,size);
 
 }
 
@@ -454,6 +454,7 @@ int main(int argc, char ** argv){
     //lint_16 calculateResultant = pointerToEndOfInfoDictionary-pointerToInfoDictioinary;
     printf("\nstuff: %ld\n", (pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
     unsigned char *info_hash = (unsigned char*) malloc(sizeof(char)*(pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
+    memset(info_hash,'0',sizeof(char)*(pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
     //check for allocation failure
         if (info_hash == NULL) {
             MALLOCALLOCATIONERROR("Varibale element->value.stringValue could not be allocated");
@@ -469,10 +470,11 @@ int main(int argc, char ** argv){
         *(info_hash+counterInfo_hash) =  *(fileContent+copyOfPointerToInfoDictionary);
     }
 
-    //major memory issue
-    printf("Last Character: %c, %ld",*(info_hash+((pointerToEndOfInfoDictionary-pointerToInfoDictioinary))), (pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
+    //major memory issue - Not really memory issue, more of an undefined behaviour
+    printf("\nLast Character: %c, %ld\n",*(info_hash+((pointerToEndOfInfoDictionary-pointerToInfoDictioinary))), (pointerToEndOfInfoDictionary-pointerToInfoDictioinary));
 
-    printf("\n%s\n",info_hash);
+    //printf("\n%s\n",info_hash);
+
     /*
     //Debugging
     printf("\nPointer to info Dict is: %li\n",pointerToInfoDictioinary);
@@ -485,6 +487,8 @@ int main(int argc, char ** argv){
     printf("\n%c",fileContent[pointerToEndOfInfoDictionary]);
     printf("\n%s",fileContent);
     */
+
+    SHA1((const unsigned char *) info_hash, ((pointerToEndOfInfoDictionary-pointerToInfoDictioinary)+1)); //+1 for the e
     free(info_hash);
     free(tempFileContent);
 	free((void *) fileContent);
