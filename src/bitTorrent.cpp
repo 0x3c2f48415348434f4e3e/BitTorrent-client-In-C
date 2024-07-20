@@ -3,6 +3,7 @@
 #include<assert.h>
 #include<stddef.h>
 #include<string.h>
+#include<stdint.h>
 
 //will comment a lot, as this is just what i like to do
 typedef unsigned long int lint_16; // allow for more values to be represented
@@ -51,6 +52,7 @@ static void isValidTorrent(const char * fileExtension);
 static int compareStrings(const char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
 //The C language does not support function overloading, so lets add extremely bad code
 static int compareUnsignedStrings(const unsigned char* str1, const char* str2, int lenOfFileExtension, int pointerForStr1, int pointerForStr2);
+static unsigned char* integerToString(int64_t val);
 
 static void SHA1(const unsigned char *infoDictionary, lint_16 size);
 static void requestTracker();
@@ -373,6 +375,51 @@ static void printBuffer(const unsigned char* buffer, lint_16 size){
     printf("\n");
 }
 
+static unsigned char* integerToString(int64_t val){
+    
+    //check if num is 0
+    if(val == 0){
+        unsigned char* zero = (unsigned char *) "0";
+        return zero;
+    }
+
+    int i=0;
+
+    //0 for false, 1 for true
+    int isNegative = 0;
+
+    if(val < 0){
+        isNegative = 1;
+    }
+
+    static unsigned char str[100] = {0};
+
+    //if val is negative remove the negative sign as it complicates stuff
+    if(isNegative){
+        val*=-1;
+    }
+
+    do{
+        str[i++] = val % 10 + '0'; //add '0' to convert to string
+    }while((val/=10) > 0);
+
+    //check if the number was negative
+    if(isNegative){
+        str[i++] = '-';
+    }
+    //null termation
+    str[i] = '\0';
+
+    //reverse string
+    for(int j = 0, k = i-1; j<k; j++, k--){
+        char temp = str[j];
+        str[j] = str[k];
+        str[k] = temp;
+    }
+
+    return str;
+}
+
 
 //SHA-1 algorithm implementation
 static void SHA1(const unsigned char *infoDictionary, lint_16 size){
@@ -383,7 +430,101 @@ we use the SHA1 format
 
 What we will do first is find the position of the info dict within the infoDictionary input
 */
-    printBuffer(infoDictionary,size);
+    //printBuffer(infoDictionary,size);
+    //pad message, so that length of message modulo
+    //512 will be 448
+    lint_16 currentSize = size;
+    lint_16 toUseToIncrementToBe64BitLess = size;
+    //if size of the length of the character to get it in bits, multiply by 8
+    currentSize*=8;
+    toUseToIncrementToBe64BitLess*=8;
+    //find miltiple where module pof 512 is 448 closest to size
+    while(((currentSize)%512) != 448){
+        currentSize++; //the actual multiple
+    }
+    printf("\nCurrentSize: %li\n",currentSize);
+    
+    //if greater than
+    if(currentSize - (toUseToIncrementToBe64BitLess) > 64){
+        while(currentSize - (toUseToIncrementToBe64BitLess) != 64){
+            toUseToIncrementToBe64BitLess++;
+        }
+    }
+    printf("\nAfter: %li",toUseToIncrementToBe64BitLess);
+
+    //if less than
+    if(currentSize - (toUseToIncrementToBe64BitLess) < 64){
+        //Find next multiple
+        //find miltiple where module pof 512 is 448 closest to size
+        while(((currentSize)%512) != 448){
+            currentSize++; //the actual multiple
+        }
+
+        //if greater than
+        if(currentSize - (toUseToIncrementToBe64BitLess) > 64){
+            while(currentSize - (toUseToIncrementToBe64BitLess) != 64){
+                toUseToIncrementToBe64BitLess++;
+            }
+        }
+
+    }
+    //convert back to byte
+    toUseToIncrementToBe64BitLess/=8;
+    unsigned char* encryptedSHA1Message = (unsigned char*) malloc(sizeof(char)*(toUseToIncrementToBe64BitLess));
+    if (encryptedSHA1Message == NULL) {
+        MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
+        (*exitProgram)(-1);
+    }
+
+    //add the normal stuff
+    for(lint_16 i = 0; i<size; i++){
+        *(encryptedSHA1Message + i) = *(infoDictionary + i);
+    }
+    //printBuffer(encryptedSHA1Message,size);
+
+    //add the padding part
+    //First we have to add a single 1 bit -> represented as 0x80 (in hex)
+    lint_16 remaining = (toUseToIncrementToBe64BitLess-size);
+    *(encryptedSHA1Message + size) = 0x80;
+    //subtract 8 from remaining (as we added 1 bit, and we can override the 0s bits with 0s)
+    remaining-=1;
+    //append 0 until remaining
+    lint_16 zeroBitsTracker = (size+1);
+    lint_16 update = 0;
+    while(remaining){
+        *(encryptedSHA1Message+(zeroBitsTracker + update)) = 0x00;
+        update++;
+        remaining--;
+    }
+    printBuffer(encryptedSHA1Message,toUseToIncrementToBe64BitLess);
+
+    int64_t orginalMessageRepIn64Bit = size;
+    unsigned char* orginalMessageRepIn64BitString = integerToString(orginalMessageRepIn64Bit);
+    printf("\n%s\n",orginalMessageRepIn64BitString);
+    //size of each char
+    lint_16 sizeOfEachChar = 0;
+    while(*(orginalMessageRepIn64BitString+sizeOfEachChar) != '\0'){
+        sizeOfEachChar++;
+    }
+
+    encryptedSHA1Message = (unsigned char *) realloc(encryptedSHA1Message, toUseToIncrementToBe64BitLess+=sizeOfEachChar);
+    if (encryptedSHA1Message == NULL) {
+        MALLOCALLOCATIONERROR("Varibale lexerResult could not be allocated");
+        (*exitProgram)(-1);
+    }
+
+    for(int i=0; i<sizeOfEachChar; i++){
+        *(encryptedSHA1Message+(toUseToIncrementToBe64BitLess+i)) = *(orginalMessageRepIn64BitString+i);
+    }
+    printBuffer(encryptedSHA1Message,toUseToIncrementToBe64BitLess+sizeOfEachChar);
+
+    //Looks like the SHA1 algorithm uses 5 32-bit words
+    //for portability we will use uint32_t
+    uint32_t memoryLocation0;
+    uint32_t memoryLocation1;
+    uint32_t memoryLocation2;
+    uint32_t memoryLocation3;
+    uint32_t memoryLocation4;
 
 }
 
